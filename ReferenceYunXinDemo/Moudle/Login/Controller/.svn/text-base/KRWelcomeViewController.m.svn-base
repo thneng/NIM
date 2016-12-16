@@ -1,0 +1,70 @@
+//
+//  KRWelcomeViewController.m
+//  SunshineHealthy
+//
+//  Created by wangjiwu on 16/3/28.
+//  Copyright © 2016年 深圳市凯如科技有限公司. All rights reserved.
+//
+
+#import "KRWelcomeViewController.h"
+#import "KRLoginView.h"
+#import "KRNavigationViewController.h"
+
+@interface KRWelcomeViewController ()
+
+
+
+@end
+
+@implementation KRWelcomeViewController
+
+#pragma mark - 生命周期
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    self.navigationController.navigationBar.hidden = YES;
+    [self requestData];
+}
+#pragma mark - 响应方法
+/**
+ 请求数据
+ */
+- (void)requestData
+{
+    KRLoginView *loginView = [[KRLoginView alloc] init];
+    
+    [loginView setBlockWithReturnBlock:^(id returnValue) {
+        
+        [[[[UIApplication sharedApplication] delegate] window] setRootViewController:[DATAMODEL.sbModel getSuperNavgationController]];
+        
+    } WithMessageBlock:^(id returnValue) {
+        
+        
+    } WithFailureBlock:^(id returnValue) {
+        
+        if ([returnValue isEqualToString:@"0"]) {
+            
+            returnValue = @"用户名或密码错误!";
+            
+            [SVProgressHUD showErrorWithStatus:returnValue];
+            
+        } else if ([returnValue isEqualToString:@"-1"]) {
+            
+            [SVProgressHUD showInfoWithStatus:@"当前手机号未注册，请注册后再登录"];
+            
+        } else {
+            
+            [SVProgressHUD showErrorWithStatus:returnValue];
+            
+        }
+        
+        [[[[UIApplication sharedApplication] delegate] window] setRootViewController:[DATAMODEL.sbModel getLoaginNavigationController]];
+        
+    }];
+    
+    [loginView autoLoginAcount];
+
+}
+
+
+@end

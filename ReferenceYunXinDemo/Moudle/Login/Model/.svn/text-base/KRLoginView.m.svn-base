@@ -1,0 +1,503 @@
+//
+//  KRLoginView.m
+//  SunshineHealthy
+//
+//  Created by jiwuwang on 16/3/5.
+//  Copyright © 2016年 深圳市凯如科技有限公司. All rights reserved.
+//
+
+#import "KRLoginView.h"
+#import "KRDataBaseHelp.h"
+#import "NTESLoginManager.h"
+#import "NTESService.h"
+#import "KRUserModel.h"
+#import "BPush.h"
+
+@interface KRLoginView ()
+
+@property (nonatomic, strong) KRBaseData *baseData;
+
+@end
+
+@implementation KRLoginView
+
+/**
+ * 登录接口
+ * HTTP请求方式 POST
+ * 接口后缀 api/authorization
+ * 参数
+ * access_token 用于验证请求合法性的认证信息，固定为“6acd2005bb519dfb4d5f9e0d3cb6d760”
+ * method 固定为“POST”
+ * username 用户名
+ * password 密码
+ * 返回值  json
+ */
+- (void)loginAcount
+{
+    // 接口后缀名
+    NSString *name = @"authorization";
+    [[KRMessageManager shareMessageManager] POST:name parameters:self.loginParame success:^(BOOL sucessful, id objc) {
+
+        //教师端用户
+        if (![objc[@"auth"][@"role_id"] isEqualToString:@"3"]) {
+            self.failureBlock(@"请用教师账号登录");
+            return ;
+        }
+        
+        // 请求成功，返回的 data
+        DATAMODEL.currentUser = [KRUserModel instanceModelWithDictionary:objc];
+        // 全局记录open_id
+        DATAMODEL.openID = objc[@"open_id"];
+        DATAMODEL.uid = objc[@"uid"];
+        
+        //登录成功，通知服务器百度推送参数
+        [self registerTag];
+        
+        //登录云信服务器
+        LoginData *logindata = [[LoginData alloc] init];
+        
+        if ([objc[@"yxdata"] isKindOfClass:[NSDictionary class]]) {
+            logindata.account   = objc[@"yxdata"][@"acc_id"];
+            logindata.token     = objc[@"yxdata"][@"token"];
+            
+            DATAMODEL.acc_id = objc[@"yxdata"][@"acc_id"];
+        }
+        
+        DATAMODEL.currentUser.acc_id = DATAMODEL.acc_id;
+        if (!DATAMODEL.isLogin) {
+            [[[NIMSDK sharedSDK] loginManager] login:logindata.account token:logindata.token completion:^(NSError *error) {
+                
+                if (!error) {
+                    [[NTESLoginManager sharedManager] setCurrentLoginData:logindata];
+                    // 通知更新首页信息数据
+                    NSString *FansAndFollowNotification = @"FansAndFollowNotification";
+                    [[NSNotificationCenter defaultCenter] postNotificationName:FansAndFollowNotification object:nil];
+                    
+                    if (DATAMODEL.pushToken) {
+                        [[NIMSDK sharedSDK] updateApnsToken:DATAMODEL.pushToken];
+                    }
+                    
+                }else
+                {
+                    // 云信自动登录
+                    LoginData *sdkData = [[LoginData alloc] init];
+                    if ([objc[@"yxdata"] isKindOfClass:[NSDictionary class]]) {
+                        sdkData.account   = objc[@"yxdata"][@"acc_id"];
+                        sdkData.token     = objc[@"yxdata"][@"token"];
+                        DATAMODEL.acc_id = objc[@"yxdata"][@"acc_id"];
+                    }
+                    DATAMODEL.currentUser.acc_id = DATAMODEL.acc_id;
+                    
+                    [[[NIMSDK sharedSDK] loginManager] autoLogin:sdkData.account
+                                                           token:sdkData.token];
+                    [[NTESServiceManager sharedManager] start];
+                    if (DATAMODEL.pushToken) {
+                        [[NIMSDK sharedSDK] updateApnsToken:DATAMODEL.pushToken];
+                        
+                    }
+                    return ;
+                }
+                
+            }];
+            
+            [[NTESServiceManager sharedManager] start];
+        }else
+        {
+            // 云信自动登录
+            LoginData *sdkData = [[LoginData alloc] init];
+            if ([objc[@"yxdata"] isKindOfClass:[NSDictionary class]]) {
+                sdkData.account   = objc[@"yxdata"][@"acc_id"];
+                sdkData.token     = objc[@"yxdata"][@"token"];
+                
+                DATAMODEL.acc_id = objc[@"yxdata"][@"acc_id"];
+            }
+            DATAMODEL.currentUser.acc_id = DATAMODEL.acc_id;
+            [[[NIMSDK sharedSDK] loginManager] autoLogin:sdkData.account
+                                                   token:sdkData.token];
+            [[NTESServiceManager sharedManager] start];
+            if (DATAMODEL.pushToken) {
+                [[NIMSDK sharedSDK] updateApnsToken:DATAMODEL.pushToken];
+            }
+        }
+        // 本地数据库写入 云信账号信息
+        NSMutableDictionary *dic = [NSMutableDictionary dictionaryWithDictionary:objc];
+        [dic setObject:self.loginParame[@"password"] forKey:@"password"];
+        // 这里可以完成用户数据的记录，持久化。对数据进行进一步处理
+        [[KRDataBaseHelp sharedInstance] executeUpdateWithTableName:KRUserTableName withData:dic SQLType:SQLtypeUpdate baseData:^(BOOL ressult, KRSQLModel *objc) {
+            switch (objc.errorCode) {
+                case KRErrorCodeInsert:
+                    DDLogInfo(@"插入数据库失败%@", objc.errorMessage);
+                    break;
+                case KRErrorCodeUpdate:
+                    DDLogInfo(@"更新数据库失败%@", objc.errorMessage);
+                    break;
+                default:
+                    break;
+            }
+        }];
+        DATAMODEL.isLogin = YES;
+        //[self fetchModel:objc];
+        self.successBlock(objc);
+    } infoMessage:^(BOOL sucessful, id objc) {
+        // 请求成功， 返回 info 提示信息
+        self.messageInfo(objc);
+    } failure:^(BOOL sucessful, id objc) {
+        // 请求失败，
+        DATAMODEL.isLogin = NO;
+        self.failureBlock(objc);
+    }];
+}
+
+
+/**
+  自动登录，在记住登录的情形下，自动登录账户
+ */
+- (void)autoLoginAcount
+{
+    // 获取本地用户数据
+    NSDictionary *objc = [DATAMODEL getCurrentUserData];
+    
+    [self.loginParame setObject:objc[@"password"] forKey:@"password"];
+    
+    [self.loginParame setObject:objc[@"auth"][@"username"] forKey:@"username"];
+    
+    
+    [self loginAcount];
+}
+
+/**
+ * 16.1注册百度云标签组接口
+ * HTTP请求方式 POST
+ * 接口后缀 api/regTag
+ * 参数
+ * access_token 用于验证请求合法性的认证信息，固定为“6acd2005bb519dfb4d5f9e0d3cb6d760”
+ * method 固定为“POST”
+ * open_id 用户登录后返回的open_id
+ * channel_id 设备ID（APP上初始化channel成功之后返回）
+ * channel_user_id 百度云推送用户ID，不是app用户ID（APP上初始化channel成功之后返回）
+ * app_type 百度云推送设备类型，固定值（iOS：4   Android：3）
+ * class_id App用户绑定的孩子所在班级ID，多个用逗号，拼接传送
+ * school_id App用户绑定的孩子所在班级ID，多个用逗号，拼接传送
+ * 返回值  json
+ */
+- (void)registerTag
+{
+    
+    [BPush bindChannelWithCompleteHandler:^(id result, NSError *error) {
+        // 需要在绑定成功后进行 settag listtag deletetag unbind 操作否则会失败
+        
+        // 网络错误
+        if (error) {
+            return ;
+        }
+        if (result) {
+            
+            // 确认绑定成功
+            if ([result[@"error_code"]intValue]!=0) {
+                return;
+            }
+            // 获取channel_id
+            NSString *myChannel_id = [BPush getChannelId];
+            DDLogInfo(@"==%@",myChannel_id);
+            
+            if (![BPush getChannelId]) {
+                return;
+            }
+            
+            if (DATAMODEL.openID.length <= 0) {
+                return;
+            }
+            
+            NSString *name = @"regTag";
+            
+            __block NSString *class_id = @"";
+            __block NSString *school_id = @"";
+            if (DATAMODEL.currentUser.children.count > 0) {
+                [DATAMODEL.currentUser.children enumerateObjectsUsingBlock:^(KRChildModel * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                    if (idx == 0) {
+                        class_id = [class_id stringByAppendingString:obj.class_id];
+                        school_id = [school_id stringByAppendingFormat:@"%@",obj.school_id];
+                    }else
+                    {
+                        class_id = [class_id stringByAppendingFormat:@",%@",obj.class_id];
+                        school_id = [school_id stringByAppendingFormat:@",%@",obj.school_id];
+                    }
+                    
+                }];
+            }
+            
+            NSDictionary *parame = @{@"access_token": DATAMODEL.access_Token,
+                                     @"method": @"POST",
+                                     @"open_id": DATAMODEL.openID,
+                                     @"device" : @"teacher",
+                                     @"channel_id": [BPush getChannelId],
+                                     @"channel_user_id": [BPush getUserId],
+                                     @"app_type": @"4",
+                                     @"class_id": class_id,
+                                     @"school_id": school_id};
+            
+            [[KRMessageManager shareMessageManager] POST:name parameters:parame success:^(BOOL sucessful, id objc) {
+                
+                
+                
+            } infoMessage:^(BOOL sucessful, id objc) {
+                
+              // [SVProgressHUD showInfoWithStatus:objc];
+                
+            } failure:^(BOOL sucessful, id objc) {
+                
+                
+                
+            }];
+
+        }
+    }];
+}
+
+/**
+ * 2.4 关注用户、取消关注用户
+ * HTTP请求方式 POST
+ * 接口后缀 follow
+ * 参数
+ * access_token 用于验证请求合法性的认证信息，固定为“6acd2005bb519dfb4d5f9e0d3cb6d760”
+ * method 关注时，固定为“POST” 取消关注时，固定为“DELETE”
+ * open_id 用户登录后返回的open_id
+ * follow_who 关注或取消关注的用户id
+ * 返回值  json
+ */
+- (void)noticeAction:(KRUserModel *)user
+{
+    NSString *name = @"follow";
+    
+    NSMutableDictionary *parame = [NSMutableDictionary dictionaryWithDictionary:@{@"access_token": DATAMODEL.access_Token,
+                             @"method": @"POST",
+                             @"open_id": DATAMODEL.openID,
+                             @"follow_who": user.uid}];
+    if (user.isFollow) {
+        [parame setObject:@"DELETE" forKey:@"method"];
+    }
+    
+    [[KRMessageManager shareMessageManager] POST:name parameters:parame success:^(BOOL sucessful, id objc) {
+        
+        
+        if (user.isFollow) {
+            DATAMODEL.currentUser.fansFollowModel.follow_count -= 1;
+        }else
+        {
+            DATAMODEL.currentUser.fansFollowModel.follow_count += 1;
+        }
+        self.successBlock(objc);
+        
+    } infoMessage:^(BOOL sucessful, id objc) {
+        
+        self.messageInfo(objc);
+        
+    } failure:^(BOOL sucessful, id objc) {
+        
+        self.failureBlock(objc);
+        
+    }];
+}
+
+/**
+ * 2.5 获取我关注的人列表 && 获取关注我的人列表
+ * HTTP请求方式 POST
+ * 接口后缀 friends/<id >
+ * 参数
+ * access_token 用于验证请求合法性的认证信息，固定为“6acd2005bb519dfb4d5f9e0d3cb6d760”
+ * method 固定为“GET”
+ * open_id 用户登录后返回的open_id
+ * id 用户ID，放于请求地址的<id>处
+ * type 1-获取我的粉丝列表，2-获取我关注的人列表
+ * 返回值  json
+ */
+- (void)members:(NSString *)uid type:(NSString *)type
+{
+    NSString *name = [NSString stringWithFormat:@"friends/%@",uid];
+    NSDictionary *parame = @{@"access_token": DATAMODEL.access_Token,
+                             @"method": @"GET",
+                             @"type": type};
+    
+    [[KRMessageManager shareMessageManager] POST:name parameters:parame success:^(BOOL sucessful, id objc) {
+        
+        if ([objc isKindOfClass:[NSArray class]]) {
+            
+            NSMutableArray *array = [NSMutableArray arrayWithCapacity:0];
+            
+            for (NSDictionary *dic in objc) {
+                KRUserModel *model = [KRUserModel instanceModelWithDictionary:dic[@"user"]];
+                
+                model.is_new = [dic getIntegerValueForKey:@"is_new" defaultValue:0];
+                model.is_follow = YES;
+                
+                [array addObject:model];
+            }
+            
+            self.successBlock(array);
+            
+        }else if ([objc isKindOfClass:[NSDictionary class]])
+        {
+            
+            if ([type isEqualToString:@"1"]) {
+                // 这里更新数据
+                DATAMODEL.currentUser.fansFollowModel.fans_count = [objc getIntegerValueForKey:@"totalCount" defaultValue:DATAMODEL.currentUser.fansFollowModel.fans_count];
+            }else if ([type isEqualToString:@"2"]) {
+                // 这里更新数据
+                DATAMODEL.currentUser.fansFollowModel.follow_count = [objc getIntegerValueForKey:@"totalCount" defaultValue:DATAMODEL.currentUser.fansFollowModel.follow_count];
+            }
+            
+            NoticeModel *model = [NoticeModel instanceModelWithDictionary:objc];
+            
+            self.successBlock(model);
+        }
+        else
+        {
+            self.failureBlock(@"error");
+        }
+        
+    } infoMessage:^(BOOL sucessful, id objc) {
+        
+        self.messageInfo(objc);
+        
+    } failure:^(BOOL sucessful, id objc) {
+        
+        self.failureBlock(objc);
+        
+    }];
+}
+
+/**
+ 将字典数组 转换成数据类
+
+ @param objc 字典或数组
+ */
+- (void)fetchModel:(id)objc
+{
+    if ([objc isKindOfClass:[NSArray class]]) {
+        
+        NSMutableArray *array = [NSMutableArray arrayWithCapacity:0];
+        
+        for (NSDictionary *dic in objc) {
+            KRUserModel *model = [KRUserModel instanceModelWithDictionary:dic];
+            
+            [array addObject:model];
+        }
+        
+        self.successBlock(array);
+        
+    }else if ([objc isKindOfClass:[NSDictionary class]])
+    {
+        
+        KRUserModel *model = [KRUserModel instanceModelWithDictionary:objc];
+        DATAMODEL.currentUser = model;
+        self.successBlock(model);
+    }
+    else
+    {
+        self.failureBlock(@"error");
+    }
+}
+
+
+/**
+ 初始化 参数字典
+
+ @return 字典
+ */
+- (NSMutableDictionary *)loginParame
+{
+    if (!_loginParame) {
+        _loginParame = [NSMutableDictionary dictionaryWithDictionary:@{@"access_token": DATAMODEL.access_Token,
+                                                                       @"method": @"POST",
+                                                                       @"username": @"",
+                                                                       @"password": @""}];
+    }
+    
+    
+    return _loginParame;
+}
+
+
+
+
+
+@end
+
+#pragma mark --- auth 数据模型
+
+
+@implementation AuthModel
+
++ (id)instanceModelWithDictionary:(NSDictionary *)dic
+{
+    
+    AuthModel *model = [[AuthModel alloc] init];
+    
+    if (dic) {
+        
+        model.uid = [dic getStringValueForKey:@"uid" defaultValue:@""];
+        
+        model.username = [dic getStringValueForKey:@"username" defaultValue:@""];
+        
+        model.last_login_time = [dic getStringValueForKey:@"last_login_time" defaultValue:@""];
+        
+        model.role_id = [dic getStringValueForKey:@"role_id" defaultValue:@""];
+        
+        model.audit = [dic getStringValueForKey:@"audit" defaultValue:@""];
+    }
+    
+    
+    return model;
+}
+
+
+@end
+
+@implementation NoticeModel
+
++ (id)instanceModelWithDictionary:(NSDictionary *)dic
+{
+    NoticeModel *model = [[NoticeModel alloc] init];
+    
+    if (dic) {
+        
+        NSMutableArray *array = [NSMutableArray arrayWithCapacity:0];
+        
+        NSArray *fArray = @[];
+        
+        if ([dic.allKeys containsObject:@"fans"]) {
+            fArray = dic[@"fans"];
+        }else
+        {
+            fArray = dic[@"follow"];
+        }
+        
+        if (fArray) {
+            for (NSDictionary *objc in fArray) {
+                KRUserModel *model = [KRUserModel instanceModelWithDictionary:objc[@"user"]];
+                
+                model.is_new = [objc getIntegerValueForKey:@"is_new" defaultValue:0];
+                model.is_follow = [objc.allKeys containsObject:@"is_follow"] ? [objc getIntegerValueForKey:@"is_follow" defaultValue:NO] : YES;
+                
+                [array addObject:model];
+            }
+        }
+        
+        model.members = array;
+        
+        model.totalCount = [dic getIntegerValueForKey:@"totalCount" defaultValue:0];
+    }
+    return model;
+}
+
+- (NSArray<KRUserModel *> *)members
+{
+    if (!_members) {
+        _members = @[];
+    }
+    
+    return _members;
+}
+
+@end
+

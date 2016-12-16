@@ -1,0 +1,78 @@
+//
+//  KRBaseAFManager.h
+//  网络封装Demo
+//
+//  Created by kairu on 16/8/25.
+//  Copyright © 2016年 kairu. All rights reserved.
+//
+
+#import <Foundation/Foundation.h>
+#import <AFNetworking/AFNetworking.h>
+
+/// 深圳测试服务器
+#define KR_SERVER       @"http://apit.ifoodsoso.cn/api/"
+
+// 返回的代码块(成功/失败).
+typedef void(^returnBlock)(BOOL sucessful, id objc);
+
+@interface KRAFManager : AFHTTPSessionManager
+
+/**
+ *  获得单列请求对象.
+ *
+ *  @return 返回单列请求对象
+ */
++ (KRAFManager *)shareBaseAFManager;
+
+/**
+ *  GET方法请求
+ *
+ *  @param URLString  请求的URL地址
+ *  @param parameter  请求的参数
+ *  @param progress   进度回调
+ *  @param success    成功回调
+ *  @param info       信息提示回调
+ *  @param failure    失败回调
+ */
+- (void)GET:(NSString *)URLString
+ parameters:(id)parameters
+   progress:(void(^)(CGFloat progress)) progress
+    success:(returnBlock)success
+    message:(returnBlock)info
+    failure:(returnBlock)failure;
+
+/**
+ *  POST方法请求
+ *
+ *  @param URLString  请求的URL地址
+ *  @param parameter  请求的参数
+ *  @param progress   进度回调
+ *  @param success    成功回调
+ *  @param info       信息提示回调
+ *  @param failure    失败回调
+ */
+- (void)Post:(NSString *)URLString
+  parameters:(id)parameters
+    progress:(void(^)(CGFloat progress)) progress
+     success:(returnBlock)success
+     message:(returnBlock)info
+     failure:(returnBlock)failure;
+
+/**
+ *  上传请求
+ *
+ *  @param URLString  请求的URL地址
+ *  @param parameter  请求的参数
+ *  @param progress   上传进度回调
+ *  @param success    成功回调
+ *  @param info       信息提示回调
+ *  @param failure    失败回调
+ */
+- (void)Upload:(NSString *)URLString
+    parameters:(id)parameters
+      progress:(void(^)(CGFloat progress)) progress
+       success:(returnBlock)success
+       message:(returnBlock)info
+       failure:(returnBlock)failure;
+
+@end

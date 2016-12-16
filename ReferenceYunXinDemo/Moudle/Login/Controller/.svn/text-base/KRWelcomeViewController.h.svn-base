@@ -1,0 +1,15 @@
+//
+//  KRWelcomeViewController.h
+//  SunshineHealthy
+//
+//  Created by wangjiwu on 16/3/28.
+//  Copyright © 2016年 深圳市凯如科技有限公司. All rights reserved.
+//
+/**
+ *  欢迎页面
+ */
+#import <UIKit/UIKit.h>
+
+@interface KRWelcomeViewController : UIViewController
+
+@end

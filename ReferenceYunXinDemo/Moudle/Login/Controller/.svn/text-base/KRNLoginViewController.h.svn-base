@@ -1,0 +1,24 @@
+//
+//  KRNLoginViewController.h
+//  SunshineHealthy
+//
+//  Created by wangjiwu on 16/4/15.
+//  Copyright © 2016年 深圳市凯如科技有限公司. All rights reserved.
+//
+/**
+ *  登录页面
+ */
+#import "KRBaseViewController.h"
+#import "KRCellModel.h"
+#import "PhoneCell.h"
+#import "KRLoginView.h"
+#import "KRNavigationViewController.h"
+#import "NSString+Judge.h"
+#import "KRForgotPwShowVc.h"
+
+@interface KRNLoginViewController : KRBaseViewController
+/// 数据源
+@property (nonatomic, strong) NSMutableArray<KRCellModel *>        *dataArray;
+/// 登录的ViewModel
+@property (nonatomic, strong) KRLoginView   *loginView;
+@end

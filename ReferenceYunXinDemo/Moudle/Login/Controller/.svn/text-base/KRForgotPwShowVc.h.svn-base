@@ -1,0 +1,15 @@
+//
+//  KRForgotPwShowVc.h
+//  SunshineHealthy
+//
+//  Created by Apple on 16/9/7.
+//  Copyright © 2016年 深圳市凯如科技有限公司. All rights reserved.
+//
+/**
+ *  忘记密码页面
+ */
+#import <UIKit/UIKit.h>
+
+@interface KRForgotPwShowVc : UIViewController
+
+@end

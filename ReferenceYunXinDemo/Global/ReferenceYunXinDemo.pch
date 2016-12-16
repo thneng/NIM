@@ -1,0 +1,56 @@
+//
+//  SunshineHealthy.pch
+//  SunshineHealthy
+//
+//  Created by James Hsu on 2/26/16.
+//  Copyright © 2016 深圳市凯如科技有限公司. All rights reserved.
+//
+
+#ifndef SunshineHealthy_pch
+#define SunshineHealthy_pch
+
+// Include any system framework and library headers here that should be included in all compilation units.
+// You will also need to set the Prefix Header build setting of one or more of your targets to reference this file.
+
+#import <UIKit/UIKit.h>
+
+#import "NIMSDK.h"
+#import "AFNetworking.h"
+#import "NIMGlobalDefs.h"
+#import "CTAssetsPickerDefines.h"
+#import "CocoaLumberjack.h"
+#import "NTESGlobalMacro.h"
+#import "NIMDemo-Prefix.h"
+
+#import "Marcros.h"
+#import "ThirdMacros.h"
+#import "KRConfigure.h"
+#import "KRDataBaseHelp.h"
+#import "KRDataModel.h"
+
+/// 云信appkey
+#define kNIMAppKey          @"c5c3a7b333497a57e99acef4439cc9b9"
+/// 教师推送证书
+#define kNIMAppCer          @"DevTeacherPushCer"
+//#define kNIMAppCer          @"PrdTeacherPushCer"
+
+//#ifdef DEBUG
+//static DDLogLevel ddLogLevel = DDLogLevelVerbose;
+//#else
+//static DDLogLevel ddLogLevel = DDLogLevelOff;
+//#endif
+
+
+///tableview背景底颜色
+#define kBackGroundColor    RGBCOLOR(238, 238, 238)
+// 颜色(RGB)
+#define RGBCOLOR(r, g, b)       [UIColor colorWithRed:(r)/255.0f green:(g)/255.0f blue:(b)/255.0f alpha:1]
+#define RGBACOLOR(r, g, b, a)   [UIColor colorWithRed:(r)/255.0f green:(g)/255.0f blue:(b)/255.0f alpha:(a)]
+
+
+#define NTES_USE_CLEAR_BAR - (BOOL)useClearBar{return YES;}
+
+#define NTES_FORBID_INTERACTIVE_POP - (BOOL)forbidInteractivePop{return YES;}
+
+
+#endif /* SunshineHealthy_pch */

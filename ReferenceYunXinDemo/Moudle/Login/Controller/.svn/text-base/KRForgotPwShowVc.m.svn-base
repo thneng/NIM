@@ -1,0 +1,44 @@
+//
+//  KRForgotPwShowVc.m
+//  SunshineHealthy
+//
+//  Created by Apple on 16/9/7.
+//  Copyright © 2016年 深圳市凯如科技有限公司. All rights reserved.
+//
+
+#import "KRForgotPwShowVc.h"
+
+@interface KRForgotPwShowVc ()
+
+@end
+
+@implementation KRForgotPwShowVc
+#pragma mark - 生命周期
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = kBackGroundColor;
+    self.view.frame = [UIScreen mainScreen].bounds;
+    self.title = @"忘记密码";
+    //creatUi
+    [self creatUiShow];
+}
+#pragma mark - 响应方法
+/**
+ 初始化UI
+ */
+-(void)creatUiShow
+{
+    //image
+    UIImageView *imageV = [[UIImageView alloc] initWithFrame:CGRectMake(FITWITH(142.5), FITHEIGHT(111), FITWITH(90), FITHEIGHT(150))];
+    imageV.image = [UIImage imageNamed:@"imgLockps"];
+    [self.view addSubview:imageV];
+    
+    //lable
+    UILabel *lableTitle = [[UILabel alloc] initWithFrame:CGRectMake(30, imageV.frame.origin.y+imageV.frame.size.height+35, self.view.frame.size.width-60, 24)];
+    lableTitle.text = @"请联系学校管理员重置密码";
+    lableTitle.textAlignment = NSTextAlignmentCenter;    lableTitle.backgroundColor = [UIColor clearColor];
+    lableTitle.font = [UIFont fontWithName:@"PingFangSC-Medium" size:FITFONTSIZE(17.0)];
+    [self.view addSubview:lableTitle];
+}
+
+@end

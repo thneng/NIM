@@ -1,0 +1,250 @@
+//
+//  KRNLoginViewController.m
+//  SunshineHealthy
+//
+//  Created by wangjiwu on 16/4/15.
+//  Copyright © 2016年 深圳市凯如科技有限公司. All rights reserved.
+//
+
+#import "KRNLoginViewController.h"
+
+
+@interface KRNLoginViewController ()
+
+@property (weak, nonatomic) IBOutlet UITableView *tableView;
+
+
+@property (weak, nonatomic) IBOutlet UIButton *loginButton;
+
+@end
+
+static NSString *cellIdenty = @"phonecell";
+
+@implementation KRNLoginViewController
+#pragma mark - 生命周期
+- (instancetype)initWithCoder:(NSCoder *)aDecoder
+{
+    self = [super initWithCoder:aDecoder];
+    if (self) {
+        self.title = @"登录";
+    }
+    
+    return self;
+}
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    self.navigationController.navigationBarHidden = NO;
+    
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    
+    [self checkloginButtonState];
+    self.tabBarController.tabBar.hidden = YES;
+    self.navigationItem.leftBarButtonItem = nil;
+ 
+    [self requestData];
+    
+}
+
+#pragma mark - 响应方法
+/**
+ 请求数据
+ */
+- (void)requestData
+{
+    
+    // 初始化ViewModel
+    self.loginView = [[KRLoginView alloc] init];
+    // 设置回调
+    [self.loginView setBlockWithReturnBlock:^(id returnValue) {
+        
+        [SVProgressHUD dismiss];
+        //登录成功逻辑处理
+        DDLogInfo(@"json -- %@", returnValue);
+        DDLogInfo(@"openId--%@",DATAMODEL.openID);
+        [[[[UIApplication sharedApplication] delegate] window] setRootViewController:[DATAMODEL.sbModel getSuperNavgationController]];
+        
+    } WithMessageBlock:^(id returnValue) {
+        
+    } WithFailureBlock:^(id returnValue) {
+        
+        // 请求失败，
+        if ([returnValue isEqualToString:@"0"]) {
+            
+            returnValue = @"用户名或密码错误!";
+            
+            [SVProgressHUD showErrorWithStatus:returnValue];
+            
+        } else if ([returnValue isEqualToString:@"-1"]) {
+            
+            [SVProgressHUD dismiss];
+            [DATAMODEL.alertView showAlertMessage:@"账号不存在,如有疑问请联系管理员"];
+        } else {
+            
+            [SVProgressHUD showErrorWithStatus:returnValue];
+            
+        }
+        
+        
+    }];
+    // 调整nav结构
+    UINavigationController *nav = self.navigationController;
+    nav.viewControllers = @[self];
+}
+/**
+ 登录
+
+ @param sender 按钮对象
+ */
+- (IBAction)loginAction:(id)sender {
+    
+    [self.view endEditing:YES];
+    
+    NSString *phone = self.dataArray[0].text;
+    NSString *password = self.dataArray[1].text;
+    
+    if (phone.length == 0) {
+        [SVProgressHUD showErrorWithStatus:@"请输入您的用户名"];
+        return;
+    }
+    
+    if (password.length == 0) {
+        [SVProgressHUD showErrorWithStatus:@"密码不能为空"];
+        return;
+    }
+    // 设置请求参数
+    [self.loginView.loginParame setObject:phone forKey:@"username"];
+    [self.loginView.loginParame setObject:password forKey:@"password"];
+    
+    [SVProgressHUD showWithStatus:@"登录中..."];
+    [SVProgressHUD setDefaultMaskType:SVProgressHUDMaskTypeClear];
+    [self.loginView loginAcount];
+}
+/**
+ 忘记密码
+
+ @param sender 按钮对象
+ */
+- (IBAction)forgotPassword:(UIButton *)sender
+{
+    //教师端忘记密码，请联系管理员
+    KRForgotPwShowVc *forgotPwVc = [[KRForgotPwShowVc alloc] init];
+    [self.navigationController pushViewController:forgotPwVc animated:YES];
+}
+
+- (void)checkloginButtonState
+{
+    
+    NSString *phone = self.dataArray[0].text;
+    NSString *password = self.dataArray[1].text;
+    
+    if (phone.length > 0 && password.length > 0) {
+        
+        self.loginButton.enabled = YES;
+    }else
+    {
+        self.loginButton.enabled = NO;
+    }
+    
+}
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    [self.view endEditing:YES];
+}
+
+#pragma mark - 代理
+#pragma mark --  UITableViewDelegate,UITableViewDataSource
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+{
+    return 1;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return self.dataArray.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    
+    PhoneCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdenty forIndexPath:indexPath];
+    
+    KRCellModel *model = self.dataArray[indexPath.row];
+    
+    cell.textField.placeholder = model.placeoder;
+    
+    cell.textField.text = model.text;
+    
+    cell.textField.secureTextEntry = model.isSecret;
+    
+    //这里用默认键盘
+    cell.textField.keyboardType = UIKeyboardTypeDefault;
+    
+    [cell setTextFieldEditingEnd:^(NSString *text) {
+        
+        model.text = text;
+        
+        [self checkloginButtonState];
+    }];
+    
+    // 点击return
+    [cell setDidClickKeyBoardReturn:^(NSString *text) {
+       
+        if (!model.isLast) {
+            
+            PhoneCell *nextCell = [tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:indexPath.row + 1 inSection:indexPath.section]];
+            
+            [nextCell.textField becomeFirstResponder];
+        }
+        
+    }];
+
+    return cell;
+    
+}
+
+
+
+#pragma mark - 懒加载
+/**
+ 初始化数据源
+
+ @return 数组
+ */
+- (NSMutableArray<KRCellModel *> *)dataArray
+{
+    if (!_dataArray) {
+        
+        KRCellModel *phone = [[KRCellModel alloc] init];
+        phone.placeoder = @"请输入您的用户名";
+        phone.text = DATAMODEL.phoneNumber;
+        
+        KRCellModel *password = [[KRCellModel alloc] init];
+        password.placeoder = @"输入密码";
+        password.text = DATAMODEL.passWord;
+        password.secret = YES;
+        password.last = YES;
+        _dataArray = [NSMutableArray arrayWithArray:@[phone,password]];
+        
+    }
+    
+    return _dataArray;
+}
+
+/**
+ 设置信息栏样式
+
+ @return 信息栏样式
+ */
+-(UIStatusBarStyle)preferredStatusBarStyle
+{
+    return UIStatusBarStyleDefault;
+}
+
+
+@end
